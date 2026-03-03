@@ -88,6 +88,7 @@ class OrderSchema(BaseModel):
     payment_type: str
 
 # ---------------- EMAIL LOGIC ----------------
+# ---------------- EMAIL LOGIC ----------------
 SENDER_EMAIL = os.getenv("EMAIL_USER")
 APP_PASSWORD = os.getenv("EMAIL_PASS")
 
@@ -97,15 +98,20 @@ def send_email_logic(receiver, subject, content, is_html=False):
         msg["Subject"] = subject
         msg["To"] = receiver
         msg["From"] = SENDER_EMAIL
-        
+
         part = MIMEText(content, "html" if is_html else "plain")
         msg.attach(part)
-        
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+
+        # ✅ Render / Cloud Friendly Method
+        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+            smtp.starttls()  # 🔥 Important
             smtp.login(SENDER_EMAIL, APP_PASSWORD)
             smtp.send_message(msg)
+
+        print(f"✅ Email sent successfully to {receiver}")
+
     except Exception as e:
-        print("Email Error:", e)
+        print("❌ Email Error:", e)
 
 # ---------------- AUTH & PASSWORD RESET ----------------
 @app.post("/signup")
@@ -161,23 +167,16 @@ def reset_password(data: ResetPasswordSchema, db: Session = Depends(get_db)):
     RESET_OTP_STORE.pop(data.email.lower())
     return {"status": "success"}
 
-# ---------------- ORDER PROCESS ----------------
+# ---------------- ORDER PROCESS (UPDATED) ----------------
 @app.post("/order")
 def place_order(data: OrderSchema, db: Session = Depends(get_db)):
     try:
-        # 1️⃣ Login check
         user = db.query(User).filter(User.email.ilike(data.email)).first()
-
         if not user:
-            return {
-                "status": "NOT_LOGGED_IN",
-                "message": "Please login to place an order"
-            }
+            return {"status": "NOT_LOGGED_IN", "message": "Please login"}
 
-        # 2️⃣ Generate unique order id
         new_order_id = f"ORD-{uuid.uuid4().hex[:8].upper()}"
 
-        # 3️⃣ Save order with foreign key user_id
         new_order = Order(
             order_id=new_order_id,
             product_name=data.product_name,
@@ -191,26 +190,22 @@ def place_order(data: OrderSchema, db: Session = Depends(get_db)):
         
         db.add(new_order)
         db.commit()
-db.refresh(new_order)
+        db.refresh(new_order)
 
-# 🔐 Auto Generate Delivery OTP
-otp = str(random.randint(1000, 9999))
-DELIVERY_OTP_STORE[data.email.lower()] = {
-    "otp": otp,
-    "time": datetime.datetime.utcnow()
-}
+        # ✅ AUTOMATIC OTP LOGIC ADDED HERE:
+        otp = str(random.randint(1000, 9999))
+        DELIVERY_OTP_STORE[data.email.lower()] = {"otp": otp, "time": datetime.datetime.utcnow()}
+        
+        # Email anuppuradhu
+        otp_content = f"Your Order #{new_order_id} has been placed! Use this OTP for delivery: {otp}"
+        send_email_logic(data.email, "Order Confirmation & Delivery OTP", otp_content)
 
-send_email_logic(
-    data.email,
-    "Delivery OTP",
-    f"Your OTP for Order #{new_order_id} is: {otp}"
-)
+        return {"status": "success", "order_id": new_order_id, "message": "Order placed and OTP sent!"}
 
-return {
-    "status": "success",
-    "order_id": new_order_id,
-    "otp_sent": True
-}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Order failed") 
+    
 # ---------------- DELIVERY OTP & FEEDBACK ----------------
 @app.post("/send-delivery-otp")
 def send_delivery_otp(data: DeliveryOTPSchema):
@@ -247,7 +242,9 @@ def verify_delivery_otp(data: VerifyDeliverySchema, db: Session = Depends(get_db
     DELIVERY_OTP_STORE.pop(data.email.lower())
 
     # 🔗 Secure feedback link
-    secure_link = f"http://127.0.0.1:8000/feedback/{token}"
+    BASE_URL = os.getenv("BASE_URL")
+
+    secure_link = f"{BASE_URL}/feedback/{token}"
 
     feedback_html = f"""
     <html>
@@ -560,3 +557,7 @@ app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
+
+
+
