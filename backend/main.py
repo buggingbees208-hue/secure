@@ -191,15 +191,26 @@ def place_order(data: OrderSchema, db: Session = Depends(get_db)):
         
         db.add(new_order)
         db.commit()
-        db.refresh(new_order)
-        
-        return {"status": "success", "order_id": new_order_id}
+db.refresh(new_order)
 
-    except Exception as e:
-        print("❌ Order Error:", str(e))
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Order processing failed") 
-    
+# 🔐 Auto Generate Delivery OTP
+otp = str(random.randint(1000, 9999))
+DELIVERY_OTP_STORE[data.email.lower()] = {
+    "otp": otp,
+    "time": datetime.datetime.utcnow()
+}
+
+send_email_logic(
+    data.email,
+    "Delivery OTP",
+    f"Your OTP for Order #{new_order_id} is: {otp}"
+)
+
+return {
+    "status": "success",
+    "order_id": new_order_id,
+    "otp_sent": True
+}
 # ---------------- DELIVERY OTP & FEEDBACK ----------------
 @app.post("/send-delivery-otp")
 def send_delivery_otp(data: DeliveryOTPSchema):
