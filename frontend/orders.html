@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Verification | ShopSecure</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                        url('https://images.unsplash.com/photo-1563013544-824ae1b704d3?q=80&w=1350') 
+                        no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 400px; padding: 20px; }
+
+        .card {
+            background: rgba(255,255,255,0.98);
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        h2 { color: #2c3e50; margin-bottom: 10px; font-weight: 600; }
+        p { color: #7f8c8d; font-size: 14px; margin-bottom: 25px; }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            font-size: 28px;
+            text-align: center;
+            letter-spacing: 10px;
+            outline: none;
+            background: #f9f9f9;
+            transition: 0.3s;
+        }
+
+        input:focus { border-color: #27ae60; background: #fff; box-shadow: 0 0 10px rgba(39, 174, 96, 0.1); }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        button:hover { background: #219150; transform: translateY(-2px); }
+
+        button:disabled { background: #bdc3c7; cursor: not-allowed; transform: none; }
+
+        .footer-text { margin-top: 25px; font-size: 12px; color: #95a5a6; }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="card">
+        <div style="font-size: 60px; margin-bottom: 15px;">📦</div>
+        <h2>Delivery Verification</h2>
+        <p>Enter the <b>4-digit OTP</b> sent to your registered email to complete your order.</p>
+
+        <input type="text" id="otp_input" placeholder="0000" maxlength="4" inputmode="numeric" autocomplete="one-time-code">
+
+        <button id="verify_btn" onclick="verifyOTP()">Verify & Confirm Receipt</button>
+
+        <div class="footer-text">
+            🛡️ ShopSecure After-Delivery Security Active
+        </div>
+    </div>
+</div>
+
+<script>
+const API = "https://secure-atb1.onrender.com";
+
+window.onload = () => {
+    const email = localStorage.getItem("user_email");
+    const orderId = localStorage.getItem("order_id");
+
+    if (!email || !orderId) {
+        alert("No active order session found. Redirecting...");
+        window.location.href = "products.html";
+        return;
+    }
+
+    document.getElementById("otp_input").focus();
+};
+
+document.getElementById("otp_input").addEventListener("input", function() {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+async function verifyOTP() {
+
+    const otpInput = document.getElementById("otp_input");
+    const btn = document.getElementById("verify_btn");
+
+    const otp = otpInput.value.trim();
+    const email = localStorage.getItem("user_email");
+    const orderId = localStorage.getItem("order_id");
+
+    console.log("Sending Data →", { email, orderId, otp });
+
+    // 🔐 Session validation (Prevents 422)
+    if (!email || !orderId) {
+        alert("⚠ Session expired. Please login again.");
+        localStorage.clear();
+        window.location.href = "login.html";
+        return;
+    }
+
+    // 🔢 OTP validation
+    if (!/^\d{4}$/.test(otp)) {
+        alert("Please enter a valid 4-digit OTP.");
+        otpInput.focus();
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "Verifying Security Code...";
+
+    try {
+
+        const response = await fetch(`${API}/verify-delivery-otp`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                email: String(email),
+                order_id: String(orderId),
+                otp: String(otp)
+            })
+        });
+
+        // Safe JSON parsing
+        let data;
+        try {
+            data = await response.json();
+        } catch {
+            data = {};
+        }
+
+        if (response.ok) {
+            // ✅ SUCCESS: Updated as requested
+            alert("✅ Order Delivered Successfully! A secure feedback link has been sent to your email.");
+
+            // 🔐 Clear only order session
+            localStorage.removeItem("order_id");
+
+            // Redirect to Home / Next Process
+            window.location.href = "index.html";
+
+        } else {
+
+            console.error("Backend Error:", data);
+
+            alert("❌ Verification Failed: " + 
+                (data.detail || "Invalid or Expired OTP"));
+
+            otpInput.value = "";
+            otpInput.focus();
+
+            btn.disabled = false;
+            btn.innerText = "Verify & Confirm Receipt";
+        }
+
+    } catch (error) {
+
+        console.error("Network Error:", error);
+
+        alert("⚠ Server not reachable. Ensure FastAPI is running.");
+
+        btn.disabled = false;
+        btn.innerText = "Verify & Confirm Receipt";
+    }
+}
+
+document.getElementById("otp_input").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") { verifyOTP(); }
+});
+</script>
+
+</body>
+</html>

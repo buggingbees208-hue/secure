@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopSecure | Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    margin:0;
+    font-family:'Poppins', sans-serif;
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),
+    url('https://images.unsplash.com/photo-1472851294608-062f824d29cc?q=80&w=1470') no-repeat center center fixed;
+    background-size: cover;
+    color:#333;
+}
+
+nav {
+    background: rgba(44,62,80,0.95);
+    padding: 15px 50px;
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top:0;
+    z-index:100;
+}
+
+.logo { color:white; font-size:24px; font-weight:bold; }
+
+.nav-links a {
+    color:#ddd;
+    text-decoration:none;
+    margin-left:20px;
+    font-weight:500;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+.nav-links a:hover { color:#27ae60; }
+
+.admin-btn {
+    border:1px solid #f1c40f;
+    padding:5px 15px;
+    border-radius:20px;
+    color:#f1c40f !important;
+}
+
+.container {
+    max-width:1200px;
+    margin:40px auto;
+    padding:0 20px;
+}
+
+.product-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:25px;
+}
+
+.product-card {
+    background:white;
+    border-radius:15px;
+    padding:15px;
+    text-align:center;
+    transition:0.3s;
+    box-shadow:0 4px 10px rgba(0,0,0,0.05);
+    border:1px solid #eee;
+}
+
+.product-card:hover {
+    transform:translateY(-10px);
+    box-shadow:0 10px 25px rgba(0,0,0,0.1);
+}
+
+.p-img {
+    width:100%;
+    height:200px;
+    object-fit:cover;
+    border-radius:10px;
+}
+
+.price {
+    color:#27ae60;
+    font-weight:bold;
+    font-size:22px;
+    margin:15px 0;
+}
+
+.buy-btn {
+    background:#27ae60;
+    color:white;
+    border:none;
+    padding:12px;
+    border-radius:8px;
+    cursor:pointer;
+    width:100%;
+    font-weight:bold;
+    font-size:16px;
+    transition:0.3s;
+}
+
+.buy-btn:hover { background:#219150; }
+
+.modal {
+    display:none;
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:white;
+    padding:30px;
+    border-radius:15px;
+    box-shadow:0 0 40px rgba(0,0,0,0.5);
+    z-index:1000;
+    width:360px;
+}
+
+.overlay {
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.7);
+    z-index:999;
+}
+
+.input-box {
+    width:100%;
+    padding:12px;
+    margin-bottom:15px;
+    border:1px solid #ddd;
+    border-radius:8px;
+    box-sizing:border-box;
+}
+
+h2 {
+    text-align:center;
+    margin-bottom:5px;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<nav>
+    <div class="logo">🛡️ ShopSecure</div>
+    <div class="nav-links">
+        <a href="index.html">Shop</a>
+        <a href="returns.html">Returns</a>
+        <a id="admin_link" href="admin.html" class="admin-btn" style="display:none;">Admin Dashboard</a>
+        <a onclick="logout()" style="color:#e74c3c;">Logout</a>
+    </div>
+</nav>
+
+<div class="overlay" id="overlay" onclick="closeModal()"></div>
+
+<div class="container">
+    <h2>Recommended Products</h2>
+    <p style="text-align:center;color:#27ae60;font-weight:bold;background:rgba(255,255,255,0.8);display:inline-block;width:100%;border-radius:5px;">
+        🛡️ Secure Delivery Framework Active
+    </p>
+    <div class="product-grid" id="productGrid"></div>
+</div>
+
+<!-- ORDER MODAL -->
+<div id="orderModal" class="modal">
+    <h3>Checkout</h3>
+    <p id="selectedProduct" style="color:#27ae60;font-weight:bold;"></p>
+    <textarea id="address" rows="3" class="input-box" placeholder="Full Delivery Address"></textarea>
+    <select id="payment_type" class="input-box">
+        <option value="COD">Cash on Delivery</option>
+        <option value="UPI">UPI Payment</option>
+    </select>
+    <div style="display:flex; gap:10px;">
+        <button onclick="confirmPurchase()" style="flex:1;background:#27ae60;color:white;border:none;border-radius:8px;padding:10px;">Place Order</button>
+        <button onclick="closeModal()" style="flex:1;background:#95a5a6;color:white;border:none;border-radius:8px;">Cancel</button>
+    </div>
+</div>
+
+<!-- DELIVERY OTP MODAL -->
+<div id="deliveryModal" class="modal" style="text-align:center;">
+    <h3>🚚 Confirm Delivery</h3>
+    <p style="font-size:13px;color:#666;">Enter the 4-digit OTP sent to your email.</p>
+    <input type="text" id="delivery_otp" maxlength="4"
+        style="width:80%;padding:12px;text-align:center;font-size:28px;letter-spacing:5px;margin-bottom:20px;border:2px solid #27ae60;border-radius:10px;">
+    <button id="verify_btn" onclick="verifyDelivery()"
+        style="width:100%;background:#2c3e50;color:white;padding:15px;border:none;border-radius:10px;">
+        Verify & Complete
+    </button>
+</div>
+
+<script>
+const API = "https://secure-atb1.onrender.com";
+
+let selectedProductName = "";
+let selectedProductPrice = 0;
+let currentOrderId = "";
+
+const products = [
+    {name:"Casio Vintage Digital", price:599, image:"https://images.unsplash.com/photo-1523170335258-f5ed11844a49?q=80&w=600"},
+    {name:"Premium Analog", price:299, image:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600"},
+    {name:"Sport Sneakers", price:249, image:"https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600"}
+];
+
+function loadProducts(){
+    const grid = document.getElementById("productGrid");
+    grid.innerHTML = "";
+    products.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "product-card";
+        card.innerHTML = `
+            <img src="${p.image}" class="p-img">
+            <h3>${p.name}</h3>
+            <p class="price">₹${p.price}</p>
+            <button class="buy-btn">Buy Now</button>
+        `;
+        card.querySelector("button").onclick = () => handleBuy(p.name, p.price);
+        grid.appendChild(card);
+    });
+}
+
+function handleBuy(name, price){
+    const email = localStorage.getItem("user_email");
+
+    if(!email){
+        localStorage.setItem("redirect_product_name", name);
+        localStorage.setItem("redirect_product_price", price);
+        window.location.href="login.html";
+        return;
+    }
+
+    selectedProductName = name;
+    selectedProductPrice = Number(price);
+
+    document.getElementById("selectedProduct").innerText = "Item: " + name;
+    document.getElementById("orderModal").style.display="block";
+    document.getElementById("overlay").style.display="block";
+}
+
+function closeModal(){
+    document.getElementById("orderModal").style.display="none";
+    document.getElementById("deliveryModal").style.display="none";
+    document.getElementById("overlay").style.display="none";
+    document.getElementById("delivery_otp").value="";
+}
+
+async function confirmPurchase(){
+    const address = document.getElementById("address").value.trim();
+    const userEmail = localStorage.getItem("user_email");
+
+    if(!userEmail){
+        alert("Login required");
+        window.location.href="login.html";
+        return;
+    }
+
+    if(!address){
+        alert("Enter delivery address");
+        return;
+    }
+
+    const orderData = {
+        email: String(userEmail),
+        product_name: String(selectedProductName),
+        price: Number(selectedProductPrice),
+        address: String(address),
+        payment_type: document.getElementById("payment_type").value
+    };
+
+    try{
+        const res = await fetch(`${API}/order`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(orderData)
+        });
+
+        const data = await res.json();
+        console.log("Order Response:", data);
+
+        if(!res.ok){
+            alert(data.detail || "Order failed");
+            return;
+        }
+
+        currentOrderId = data.order_id;
+
+        alert("Order placed successfully!");
+        closeModal();
+        startDeliveryProcess();
+
+    }catch(err){
+        alert("Server error");
+    }
+}
+
+async function startDeliveryProcess(){
+    try{
+        const res = await fetch(`${API}/send-delivery-otp`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                email: localStorage.getItem("user_email"),
+                order_id: currentOrderId
+            })
+        });
+
+        if(!res.ok){
+            alert("Failed to send OTP");
+            return;
+        }
+
+        document.getElementById("deliveryModal").style.display="block";
+        document.getElementById("overlay").style.display="block";
+
+    }catch{
+        alert("OTP error");
+    }
+}
+
+async function verifyDelivery(){
+    const otp = document.getElementById("delivery_otp").value.trim();
+
+    if(!/^\d{4}$/.test(otp)){
+        alert("Enter valid 4-digit OTP");
+        return;
+    }
+
+    try{
+        const res = await fetch(`${API}/verify-delivery-otp`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                email: localStorage.getItem("user_email"),
+                otp: otp,
+                order_id: currentOrderId
+            })
+        });
+
+        const data = await res.json();
+
+        if(!res.ok){
+            alert(data.detail || "Invalid OTP");
+            return;
+        }
+
+        alert("✅ Order Delivery Confirmed!");
+        currentOrderId="";
+        closeModal();
+        window.location.href="index.html";
+
+    }catch{
+        alert("Verification error");
+    }
+}
+
+function logout(){
+    localStorage.clear();
+    window.location.href="login.html";
+}
+
+window.onload = function(){
+    loadProducts();
+
+    if(localStorage.getItem("userRole")==="admin"){
+        document.getElementById("admin_link").style.display="inline-block";
+    }
+};
+</script>
+
+</body>
+</html>

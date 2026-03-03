@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Login | ShopSecure</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #2980b9;
+            --dark-blue: #2471a3;
+            --card-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body {    
+            /* Background image fix - ensure images/bg.jpg exists in frontend folder */
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6))
+                        no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .card {
+            background: var(--card-bg);
+            width: 380px;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-5px); }
+
+        h2 { color: #2c3e50; margin-bottom: 25px; font-weight: 600; }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            outline: none;
+            font-family: inherit;
+            transition: 0.3s;
+        }
+
+        input:focus { border-color: var(--primary-blue); box-shadow: 0 0 8px rgba(41, 128, 185, 0.2); }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover { background: var(--dark-blue); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+
+        .links { margin-top: 25px; font-size: 14px; color: #7f8c8d; }
+
+        a {
+            cursor: pointer;
+            color: var(--primary-blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover { text-decoration: underline; }
+
+        .hidden { display: none; }
+
+        .input-wrapper { position: relative; }
+
+        .eye-icon { 
+            position: absolute; 
+            right: 15px; 
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer; 
+            color: #7f8c8d; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="loginSection">
+        <h2>🛡️ ShopSecure</h2>
+        <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 20px;">Welcome back! Please login.</p>
+        <div class="input-group">
+            <input type="email" id="loginEmail" placeholder="Email Address">
+        </div>
+        <div class="input-group">
+            <input type="password" id="loginPassword" placeholder="Password">
+        </div>
+        <button onclick="loginUser()">Login</button>
+        <div class="links">
+            <a onclick="showForgot()">Forgot Password?</a> | <a href="signup.html">Create Account</a>
+        </div>
+    </div>
+
+    <div id="forgotSection" class="hidden">
+        <h2>Reset Password</h2>
+        <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Enter your email to receive a 4-digit OTP.</p>
+        <input type="email" id="forgotEmail" placeholder="Enter Registered Email">
+        <button onclick="sendResetOTP()">Send OTP</button>
+        <div class="links">
+            <a onclick="showLogin()">← Back to Login</a>
+        </div>
+    </div>
+
+    <div id="resetSection" class="hidden">
+        <h2>Verify OTP</h2>
+        <div class="input-group">
+            <input type="text" id="otpInput" placeholder="4-Digit OTP" maxlength="4">
+        </div>
+        <div class="input-group input-wrapper">
+            <input type="password" id="newPassword" placeholder="New Password">
+            <span class="eye-icon" onclick="togglePassword()">👁️</span>
+        </div>
+        <button onclick="resetPassword()">Update Password</button>
+    </div>
+</div>
+
+<script>
+// Backend URL - Adjust if your port is different
+const API = "https://secure-atb1.onrender.com";
+let tempEmail = "";
+
+async function loginUser(){
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+    
+    if(!email || !password){ 
+        alert("Please enter both email and password."); 
+        return; 
+    }
+
+    try {
+        const res = await fetch(`${API}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            // CRITICAL: Save role to localStorage for Admin Page Check
+            localStorage.setItem("user_email", data.email);
+            localStorage.setItem("userName", data.user_name);
+            localStorage.setItem("user_role", data.role);
+            
+            console.log("Logged in as:", data.role);
+
+            // Redirection Logic
+            if (data.role === "admin") {
+                window.location.href = "admin.html";
+            } else {
+                window.location.href = "index.html";
+            }
+        } else {
+            alert(data.detail || "Invalid Email or Password");
+        }
+    } catch (err) {
+        alert("Connection Error: Is the FastAPI server running?");
+        console.error(err);
+    }
+}
+
+// UI Toggle Functions
+function showForgot() { 
+    toggleSections("forgotSection");
+}
+function showLogin() { 
+    toggleSections("loginSection");
+}
+function toggleSections(id) {
+    ["loginSection", "forgotSection", "resetSection"].forEach(sec => {
+        document.getElementById(sec).classList.add("hidden");
+    });
+    document.getElementById(id).classList.remove("hidden");
+}
+
+async function sendResetOTP() {
+    const email = document.getElementById("forgotEmail").value.trim();
+    if(!email) { alert("Please enter email"); return; }
+    tempEmail = email;
+    try {
+        const res = await fetch(`${API}/forgot-password`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ email })
+        });
+        if(res.ok) {
+            alert("OTP sent to your email! 📩");
+            toggleSections("resetSection");
+        } else {
+            const err = await res.json();
+            alert(err.detail);
+        }
+    } catch(e) { alert("Server error"); }
+}
+
+async function resetPassword() {
+    const otp = document.getElementById("otpInput").value.trim();
+    const newPassword = document.getElementById("newPassword").value.trim();
+    
+    if(!otp || !newPassword) { alert("Fill all fields"); return; }
+
+    try {
+        const res = await fetch(`${API}/reset-password`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ email: tempEmail, otp, new_password: newPassword })
+        });
+        if(res.ok) {
+            alert("Password updated successfully! Please login.");
+            showLogin();
+        } else {
+            const err = await res.json();
+            alert(err.detail);
+        }
+    } catch(e) { alert("Error updating password"); }
+}
+
+function togglePassword() { 
+    const pwd = document.getElementById("newPassword"); 
+    pwd.type = pwd.type === "password" ? "text" : "password"; 
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard | ShopSecure Security</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+body { background:#f4f7f6; font-family:'Poppins',sans-serif; margin:0; display:flex; }
+.sidebar { width:250px; height:100vh; background:#2c3e50; color:white; padding:20px; position:fixed; }
+.sidebar h2 { color:#f1c40f; }
+.sidebar a { display:block; color:#bdc3c7; padding:12px; text-decoration:none; cursor:pointer; }
+.sidebar a:hover { background:#34495e; border-radius:6px; color:white; }
+
+.main-content { margin-left:250px; padding:40px; width:calc(100% - 250px); }
+
+.stats-container { display:flex; gap:20px; margin-bottom:30px; }
+.stat-card { background:white; padding:25px; border-radius:12px; flex:1; box-shadow:0 4px 15px rgba(0,0,0,0.05); }
+.stat-card p { font-size:28px; font-weight:bold; }
+
+table { width:100%; background:white; border-collapse:collapse; border-radius:12px; overflow:hidden; margin-top:20px; }
+th, td { padding:14px; border-bottom:1px solid #eee; }
+th { background:#f8f9fa; }
+
+.status-accepted { color:#27ae60; font-weight:bold; }
+.status-rejected { color:#e74c3c; font-weight:bold; }
+.status-pending { color:#f39c12; font-weight:bold; }
+
+.button-approve { background:#27ae60; color:white; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; }
+.button-reject { background:#e74c3c; color:white; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; }
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <h2>🛡️ Admin Panel</h2>
+    <a onclick="loadAdminDashboard()">🔄 Refresh</a>
+    <a href="products.html">🌐 Shop Front</a>
+    <a onclick="logout()" style="color:#e74c3c;">🚪 Logout</a>
+</div>
+
+<div class="main-content">
+
+<h1>Security Dashboard</h1>
+
+<div class="stats-container">
+    <div class="stat-card">
+        <h4>Total Orders</h4>
+        <p id="total_orders">0</p>
+    </div>
+    <div class="stat-card">
+        <h4>Total Returns</h4>
+        <p id="total_returns">0</p>
+    </div>
+    <div class="stat-card">
+        <h4>Critical Alerts</h4>
+        <p id="security_alerts">0</p>
+    </div>
+</div>
+
+<h2>📝 Pending Returns</h2>
+<table>
+<thead>
+<tr>
+<th>Order ID</th>
+<th>Email</th>
+<th>Reason</th>
+<th>AI Similarity %</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="pending_returns_body">
+<tr><td colspan="5" align="center">Loading...</td></tr>
+</tbody>
+</table>
+
+<hr style="margin:40px 0;">
+
+<h2>🚨 Security Logs</h2>
+<table>
+<thead>
+<tr>
+<th>Email</th>
+<th>Risk %</th>
+<th>Severity</th>
+<th>Status</th>
+<th>Date</th>
+</tr>
+</thead>
+<tbody id="security_logs_body">
+<tr><td colspan="5" align="center">Loading...</td></tr>
+</tbody>
+</table>
+
+</div>
+
+<script>
+const API = "https://secure-atb1.onrender.com";
+
+window.onload = function() {
+    const role = (localStorage.getItem("user_role") || "").toLowerCase();
+    if (role === "admin") {
+        loadAdminDashboard();
+    } else {
+        alert("Access Denied");
+        window.location.href = "login.html";
+    }
+};
+
+async function loadAdminDashboard() {
+    try {
+        const res = await fetch(`${API}/admin/dashboard-stats`);
+        const data = await res.json();
+
+        // Stats
+        document.getElementById("total_orders").innerText = data.total_orders || 0;
+        document.getElementById("total_returns").innerText = data.total_returns || 0;
+        document.getElementById("security_alerts").innerText = data.security_alerts || 0;
+
+        const logs = data.logs_list || [];
+
+        // ---------------- LOGS TABLE ----------------
+        const logBody = document.getElementById("security_logs_body");
+        logBody.innerHTML = "";
+
+        if (logs.length === 0) {
+            logBody.innerHTML = "<tr><td colspan='5' align='center'>No logs found</td></tr>";
+        } else {
+            logs.forEach(log => {
+                logBody.innerHTML += `
+                    <tr>
+                        <td>${log.email}</td>
+                        <td>${log.risk_score}%</td>
+                        <td>${log.severity}</td>
+                        <td class="status-${log.final_status.toLowerCase()}">${log.final_status}</td>
+                        <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ---------------- PENDING RETURNS ----------------
+        const pendingBody = document.getElementById("pending_returns_body");
+        const pending = logs.filter(l => l.final_status === "PENDING");
+
+        if (pending.length === 0) {
+            pendingBody.innerHTML = "<tr><td colspan='5' align='center'>✅ No pending reviews</td></tr>";
+        } else {
+            pendingBody.innerHTML = "";
+            pending.forEach(p => {
+                pendingBody.innerHTML += `
+                <tr>
+                    <td><b>${p.order_id}</b></td>
+                    <td>${p.email}</td>
+                    <td><small>${p.reason || "N/A"}</small></td>
+                    <td style="color:#f39c12; font-weight:bold;">
+                        ${(100 - p.risk_score).toFixed(2)}% (Medium Risk)
+                    </td>
+                    <td>
+                        <button class="button-approve" onclick="decideReturn('${p.order_id}', 'ACCEPTED')">Approve</button>
+                        <button class="button-reject" onclick="decideReturn('${p.order_id}', 'REJECTED')">Reject</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+    } catch (err) {
+        alert("Failed to load dashboard");
+        console.error(err);
+    }
+}
+
+// ✅ Decision Function (Correct Version)
+async function decideReturn(order_id, decision) {
+    if (!confirm(`Confirm ${decision} for Order ${order_id}?`)) return;
+
+    try {
+        const res = await fetch(`${API}/admin/return-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                order_id: String(order_id),
+                decision: decision
+            })
+        });
+
+        if (res.ok) {
+            alert(`Order ${order_id} ${decision.toLowerCase()} successfully.`);
+            loadAdminDashboard();
+        } else {
+            const errData = await res.json();
+            alert("Error: " + errData.detail);
+        }
+
+    } catch (err) {
+        alert("Network error.");
+        console.error(err);
+    }
+}
+
+function logout() {
+    localStorage.clear();
+    window.location.href = "login.html";
+}
+</script>
+
+</body>
+</html>
