@@ -115,7 +115,7 @@ def send_email_logic(receiver, subject, content, is_html=False):
     except Exception as e:
         print("❌ Email Error:", e)
 def delayed_otp_email(email, subject, content):
-    time.sleep(30)  # 🔥 30 seconds (1 minute) wait pannum
+    time.sleep(5)  # 🔥 30 seconds (1 minute) wait pannum
     send_email_logic(email, subject, content)
 
 # ---------------- AUTH & PASSWORD RESET ----------------
@@ -341,6 +341,7 @@ async def google_form_webhook(data: GoogleFeedbackSchema, db: Session = Depends(
         db.add(new_feedback)
 
         # 🚨 Admin Alert
+        sim_score = random.uniform(40, 95)
         if security_status != "Safe":
             db.add(TransactionLog(
                 email=data.email,
@@ -351,7 +352,7 @@ async def google_form_webhook(data: GoogleFeedbackSchema, db: Session = Depends(
                 final_status="ALERT TRIGGERED",
                 timestamp=datetime.datetime.utcnow()
             ))
-            sim_score = random.uniform(40, 95)
+            
         # 🗑 Delete token after use (One-time link)
         db.delete(token_record)
 
@@ -439,6 +440,7 @@ async def process_return(
         email=email,
         order_id=order_id,
         risk_score=risk_score,
+        similarity=sim_score,
         severity=severity,
         final_status=decision,
         timestamp=datetime.datetime.utcnow()
