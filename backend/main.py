@@ -90,9 +90,10 @@ class OrderSchema(BaseModel):
     payment_type: str
 
 # ---------------- EMAIL LOGIC ----------------
-# ---------------- EMAIL LOGIC ----------------
-SENDER_EMAIL = os.getenv("EMAIL_USER")
-APP_PASSWORD = os.getenv("EMAIL_PASS")
+# ---------------- EMAIL LOGIC UPDATED ----------------
+SENDER_EMAIL = os.getenv("SENDER_EMAIL") # Unga verified Brevo email
+SMTP_USER = os.getenv("EMAIL_USER")     # Brevo-oda login ID (mostly email dhaan)
+SMTP_PASS = os.getenv("EMAIL_PASS")     # Brevo SMTP Key
 
 def send_email_logic(receiver, subject, content, is_html=False):
     try:
@@ -104,10 +105,10 @@ def send_email_logic(receiver, subject, content, is_html=False):
         part = MIMEText(content, "html" if is_html else "plain")
         msg.attach(part)
 
-        # ✅ Render / Cloud Friendly Method
-        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-            smtp.starttls()  # 🔥 Important
-            smtp.login(SENDER_EMAIL, APP_PASSWORD)
+        # ✅ Brevo SMTP Settings
+        with smtplib.SMTP("smtp-relay.brevo.com", 587) as smtp:
+            smtp.starttls() 
+            smtp.login(SMTP_USER, SMTP_PASS)
             smtp.send_message(msg)
 
         print(f"✅ Email sent successfully to {receiver}")
@@ -115,9 +116,8 @@ def send_email_logic(receiver, subject, content, is_html=False):
     except Exception as e:
         print("❌ Email Error:", e)
 def delayed_otp_email(email, subject, content):
-    time.sleep(5)  # 🔥 30 seconds (1 minute) wait pannum
+    time.sleep(5)  # 5 seconds wait panni mail anuppum
     send_email_logic(email, subject, content)
-
 # ---------------- AUTH & PASSWORD RESET ----------------
 @app.post("/signup")
 def signup(data: SignupSchema, db: Session = Depends(get_db)):
@@ -557,11 +557,16 @@ async def serve_admin():
     return FileResponse(os.path.join(FRONTEND_DIR, "admin.html"))
 
 # ---------------- STATIC FILES ----------------
-if os.path.exists(os.path.join(FRONTEND_DIR, "images")):
-    app.mount("/images", StaticFiles(directory=os.path.join(FRONTEND_DIR, "images")), name="images")
+# ---------------- STATIC FILES ----------------
+# 1. First mount uploads & images (Specific paths)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 
+images_path = os.path.join(FRONTEND_DIR, "images")
+if os.path.exists(images_path):
+    app.mount("/images", StaticFiles(directory=images_path), name="images")
+
+# 2. Last mount the root directory (General path)
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     import uvicorn
