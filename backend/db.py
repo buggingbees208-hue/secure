@@ -48,7 +48,6 @@ class ReturnReq(Base):
     order_id = Column(String(50), ForeignKey("orders.order_id"))
     email = Column(String(150))
     reason = Column(String(150))
-    description = Column(Text, nullable=True)
     return_image = Column(String(255))
     similarity = Column(Float)
     decision = Column(String(50))

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
@@ -11,6 +11,8 @@ import os, uuid, random, shutil, datetime, smtplib, warnings
 from pathlib import Path
 from datetime import timedelta
 from db import FeedbackToken
+import time
+
 
 from db import Base, engine, get_db, User, Order, ReturnReq, TransactionLog, Feedback
 
@@ -112,6 +114,9 @@ def send_email_logic(receiver, subject, content, is_html=False):
 
     except Exception as e:
         print("❌ Email Error:", e)
+def delayed_otp_email(email, subject, content):
+    time.sleep(30)  # 🔥 30 seconds (1 minute) wait pannum
+    send_email_logic(email, subject, content)
 
 # ---------------- AUTH & PASSWORD RESET ----------------
 @app.post("/signup")
@@ -169,7 +174,7 @@ def reset_password(data: ResetPasswordSchema, db: Session = Depends(get_db)):
 
 # ---------------- ORDER PROCESS (UPDATED) ----------------
 @app.post("/order")
-def place_order(data: OrderSchema, db: Session = Depends(get_db)):
+def place_order(data: OrderSchema, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         user = db.query(User).filter(User.email.ilike(data.email)).first()
         if not user:
@@ -190,20 +195,21 @@ def place_order(data: OrderSchema, db: Session = Depends(get_db)):
         
         db.add(new_order)
         db.commit()
-        db.refresh(new_order)
 
-        # ✅ AUTOMATIC OTP LOGIC ADDED HERE:
+        # ✅ OTP Generation (Internal)
         otp = str(random.randint(1000, 9999))
         DELIVERY_OTP_STORE[data.email.lower()] = {"otp": otp, "time": datetime.datetime.utcnow()}
         
-        # Email anuppuradhu
+        # 🔥 Background Task: 1 minute kalithu mail anuppum
         otp_content = f"Your Order #{new_order_id} has been placed! Use this OTP for delivery: {otp}"
-        send_email_logic(data.email, "Order Confirmation & Delivery OTP", otp_content)
+        background_tasks.add_task(delayed_otp_email, data.email, "Order Confirmation & Delivery OTP", otp_content)
 
-        return {"status": "success", "order_id": new_order_id, "message": "Order placed and OTP sent!"}
+        # ✅ User-ku udane response poyidum
+        return {"status": "success", "order_id": new_order_id, "message": "Order placed successfully!"}
 
     except Exception as e:
         db.rollback()
+        print("Order Error:", e)
         raise HTTPException(status_code=500, detail="Order failed") 
     
 # ---------------- DELIVERY OTP & FEEDBACK ----------------
@@ -326,7 +332,7 @@ async def google_form_webhook(data: GoogleFeedbackSchema, db: Session = Depends(
             comment=data.comment,
             seal_intact=data.seal_intact,
             identity_verified=data.identity_verified,
-            package_photo_url=data.photo_url,
+            photo_url=data.photo_url,
             delivery_time=data.delivery_time,
             security_status=security_status,
             created_at=datetime.datetime.utcnow()
@@ -341,10 +347,11 @@ async def google_form_webhook(data: GoogleFeedbackSchema, db: Session = Depends(
                 order_id=data.order_id,
                 risk_score=90.0,
                 severity="CRITICAL",
+                similarity=sim_score,
                 final_status="ALERT TRIGGERED",
                 timestamp=datetime.datetime.utcnow()
             ))
-
+            sim_score = random.uniform(40, 95)
         # 🗑 Delete token after use (One-time link)
         db.delete(token_record)
 
